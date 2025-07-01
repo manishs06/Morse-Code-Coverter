@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Morse Code Converter</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo">&#9679;– Morse<span class="brand-dot">.</span>Code</div>
+            <nav class="nav-tabs">
+                <button class="tab-btn active" id="tab-converter">Converter</button>
+                <button class="tab-btn" id="tab-game">Game</button>
+                <button class="tab-btn" id="tab-tutorial">Tutorial</button>
+            </nav>
+            <button id="dark-toggle" class="dark-toggle" aria-label="Toggle dark mode">🌙</button>
+        </header>
+        <div id="converter-section">
+            <form method="POST" class="converter-form" id="morse-form">
+                <div class="radio-group">
+                    <label><input type="radio" name="direction" value="text-to-morse" {% if direction == 'text-to-morse' %}checked{% endif %}> Text to Morse</label>
+                    <label><input type="radio" name="direction" value="morse-to-text" {% if direction == 'morse-to-text' %}checked{% endif %}> Morse to Text</label>
+                </div>
+                <div class="input-group">
+                    <textarea id="text-input" name="text" placeholder="Enter text..." {% if direction != 'text-to-morse' %}disabled{% endif %}>{{ text }}</textarea>
+                    <textarea id="morse-input" name="morse" placeholder="Enter morse code..." {% if direction != 'morse-to-text' %}disabled{% endif %}>{{ morse }}</textarea>
+                </div>
+                <div class="button-row">
+                    <button type="submit">Convert</button>
+                    <button type="button" id="clear-btn" class="secondary">Clear All</button>
+                </div>
+            </form>
+            {% if result %}
+            <div class="result">
+                <h2>Result</h2>
+                <div class="output" id="result-output">{{ result }}</div>
+                <button type="button" id="copy-btn">📋 Copy</button>
+                <span id="copy-msg" class="copy-msg"></span>
+                {% if direction == 'text-to-morse' and result %}
+                <div id="playing-indicator" class="playing-indicator" style="display:none;">🔊 Playing...</div>
+                <audio id="morse-audio" style="display:none;"></audio>
+                <script>
+                window.addEventListener('DOMContentLoaded', function() {
+                    // Only auto-play if this is a POST request and text-to-morse
+                    {% if request.method == 'POST' %}
+                    const morse = '{{ result }}';
+                    const indicator = document.getElementById('playing-indicator');
+                    indicator.style.display = 'inline-block';
+                    fetch('/play_morse', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                        body: 'morse=' + encodeURIComponent(morse)
+                    })
+                    .then(response => response.blob())
+                    .then(blob => {
+                        const audio = document.getElementById('morse-audio');
+                        audio.src = URL.createObjectURL(blob);
+                        audio.onended = function() {
+                            indicator.textContent = '✅ Done!';
+                            setTimeout(() => indicator.style.display = 'none', 1200);
+                        };
+                        audio.play();
+                    });
+                    {% endif %}
+                });
+                </script>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        <!-- Morse Code Game Section -->
+        <div id="game-section" style="display:none;">
+            <div class="game-box">
+                <h2>Morse Code Game: Guess the Code</h2>
+                <div class="difficulty-group">
+                    <label><input type="radio" name="difficulty" value="easy" checked> Easy (Letters)</label>
+                    <label><input type="radio" name="difficulty" value="medium"> Medium (Letters & Numbers)</label>
+                    <label><input type="radio" name="difficulty" value="hard"> Hard (Words)</label>
+                </div>
+                <p id="game-instructions">Listen to the Morse code and select the correct answer.</p>
+                <div class="game-controls">
+                    <button id="play-morse-game" class="primary">🔊 Play Morse</button>
+                    <span id="game-morse-display"></span>
+                </div>
+                <div id="game-options" class="game-options"></div>
+                <div id="game-feedback"></div>
+                <div class="game-score">Score: <span id="game-score">0</span></div>
+                <button id="game-next" style="display:none;">Next</button>
+            </div>
+        </div>
+        <!-- Morse Code Tutorial Section -->
+        <div id="tutorial-section" style="display:none;">
+            <div class="tutorial-box">
+                <h2>Learn Morse Code</h2>
+                <p>Click any letter or number to hear its Morse code.</p>
+                <div class="morse-chart">
+                    <div class="chart-row">
+                        <span class="chart-label">A–Z:</span>
+                        {% for c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' %}
+                        <button class="chart-btn" data-char="{{ c }}">{{ c }} <span class="morse-code">{{ morseDict[c] }}</span></button>
+                        {% endfor %}
+                    </div>
+                    <div class="chart-row">
+                        <span class="chart-label">0–9:</span>
+                        {% for c in '0123456789' %}
+                        <button class="chart-btn" data-char="{{ c }}">{{ c }} <span class="morse-code">{{ morseDict[c] }}</span></button>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="tutorial-tips">
+                    <h3>Tips for Learning Morse Code</h3>
+                    <ul>
+                        <li>Practice a few letters at a time.</li>
+                        <li>Listen to the sounds and try to recognize the rhythm.</li>
+                        <li>Use mnemonics or visual patterns to remember tricky letters.</li>
+                        <li>Try the game mode for extra practice!</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <footer>
+            <p>
+                <a href="#" id="about-link">About Morse Code</a> &middot; Made with ❤️ using Flask
+            </p>
+        </footer>
+    </div>
+    <!-- About Modal -->
+    <div id="about-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="close-modal">&times;</span>
+            <h2>About Morse Code</h2>
+            <p>Morse code is a method used to encode text characters as sequences of dots (.) and dashes (–). It was widely used in telegraphy and is still used in aviation, amateur radio, and assistive technology.</p>
+            <p>For example, <b>SOS</b> in Morse code is <b>... --- ...</b></p>
+            <p><a href="https://en.wikipedia.org/wiki/Morse_code" target="_blank">Learn more on Wikipedia</a></p>
+        </div>
+    </div>
+    <script>
+        // Tab switching
+        const tabConverter = document.getElementById('tab-converter');
+        const tabGame = document.getElementById('tab-game');
+        const tabTutorial = document.getElementById('tab-tutorial');
+        const converterSection = document.getElementById('converter-section');
+        const gameSection = document.getElementById('game-section');
+        const tutorialSection = document.getElementById('tutorial-section');
+        tabConverter.onclick = function() {
+            tabConverter.classList.add('active');
+            tabGame.classList.remove('active');
+            tabTutorial.classList.remove('active');
+            converterSection.style.display = '';
+            gameSection.style.display = 'none';
+            tutorialSection.style.display = 'none';
+        };
+        tabGame.onclick = function() {
+            tabGame.classList.add('active');
+            tabConverter.classList.remove('active');
+            tabTutorial.classList.remove('active');
+            converterSection.style.display = 'none';
+            gameSection.style.display = '';
+            tutorialSection.style.display = 'none';
+            startGame();
+        };
+        tabTutorial.onclick = function() {
+            tabTutorial.classList.add('active');
+            tabConverter.classList.remove('active');
+            tabGame.classList.remove('active');
+            converterSection.style.display = 'none';
+            gameSection.style.display = 'none';
+            tutorialSection.style.display = '';
+        };
+        // Dark mode toggle
+        const darkToggle = document.getElementById('dark-toggle');
+        darkToggle.onclick = function() {
+            document.body.classList.toggle('dark');
+            localStorage.setItem('darkMode', document.body.classList.contains('dark'));
+        };
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.body.classList.add('dark');
+        }
+        // Enable/disable textareas based on radio selection
+        document.querySelectorAll('input[name="direction"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                const textArea = document.getElementById('text-input');
+                const morseArea = document.getElementById('morse-input');
+                textArea.disabled = this.value !== 'text-to-morse';
+                morseArea.disabled = this.value !== 'morse-to-text';
+                if (this.value === 'text-to-morse') {
+                    textArea.focus(); textArea.select();
+                } else {
+                    morseArea.focus(); morseArea.select();
+                }
+            });
+        });
+        // Copy to clipboard
+        const copyBtn = document.getElementById('copy-btn');
+        if (copyBtn) {
+            copyBtn.onclick = function() {
+                const output = document.getElementById('result-output').textContent;
+                navigator.clipboard.writeText(output).then(() => {
+                    const msg = document.getElementById('copy-msg');
+                    msg.textContent = 'Copied!';
+                    setTimeout(() => msg.textContent = '', 1200);
+                });
+            };
+        }
+        // Clear all
+        document.getElementById('clear-btn').onclick = function() {
+            document.getElementById('text-input').value = '';
+            document.getElementById('morse-input').value = '';
+            document.getElementById('text-input').disabled = false;
+            document.getElementById('morse-input').disabled = false;
+            document.getElementById('text-input').focus();
+            document.getElementById('morse-input').blur();
+        };
+        // About modal
+        const aboutLink = document.getElementById('about-link');
+        const aboutModal = document.getElementById('about-modal');
+        const closeModal = document.getElementById('close-modal');
+        aboutLink.onclick = function(e) {
+            e.preventDefault();
+            aboutModal.style.display = 'block';
+        };
+        closeModal.onclick = function() {
+            aboutModal.style.display = 'none';
+        };
+        window.onclick = function(event) {
+            if (event.target == aboutModal) {
+                aboutModal.style.display = 'none';
+            }
+        };
+        // Morse Code Game Logic
+        const morseDict = {
+            'A': '.-', 'B': '-...', 'C': '-.-.', 'D': '-..', 'E': '.', 'F': '..-.',
+            'G': '--.', 'H': '....', 'I': '..', 'J': '.---', 'K': '-.-', 'L': '.-..',
+            'M': '--', 'N': '-.', 'O': '---', 'P': '.--.', 'Q': '--.-', 'R': '.-.',
+            'S': '...', 'T': '-', 'U': '..-', 'V': '...-', 'W': '.--', 'X': '-..-',
+            'Y': '-.--', 'Z': '--..',
+            '0': '-----', '1': '.----', '2': '..---', '3': '...--', '4': '....-',
+            '5': '.....', '6': '-....', '7': '--...', '8': '---..', '9': '----.'
+        };
+        const letterList = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+        const numberList = '0123456789'.split('');
+        const wordList = [
+            'HELLO', 'WORLD', 'CODE', 'PYTHON', 'MORSE', 'GAME', 'TEST', 'SMILE', 'LEARN', 'RADIO',
+            'QUIZ', 'BRAIN', 'SMART', 'LIGHT', 'SOUND', 'NIGHT', 'EARTH', 'SPACE', 'WATER', 'FIRE',
+            'LOVE', 'PEACE', 'HAPPY', 'LUCKY', 'GREEN', 'BLACK', 'WHITE', 'BLUE', 'RED', 'YELLOW',
+            'DOG', 'CAT', 'BIRD', 'FISH', 'HORSE', 'COW', 'SHEEP', 'GOAT', 'LION', 'TIGER'
+        ];
+        function wordToMorse(word) {
+            return word.split('').map(c => morseDict[c] || '').join(' ');
+        }
+        let gameScore = 0;
+        let currentAnswer = '';
+        let currentLevel = 'easy';
+        function getRandomFrom(arr) {
+            return arr[Math.floor(Math.random() * arr.length)];
+        }
+        function getOptions(correct, pool) {
+            const options = [correct];
+            while (options.length < 4) {
+                const rand = getRandomFrom(pool);
+                if (!options.includes(rand)) options.push(rand);
+            }
+            return shuffle(options);
+        }
+        function shuffle(arr) {
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+        function startGame() {
+            gameScore = 0;
+            nextRound();
+        }
+        function nextRound() {
+            currentLevel = document.querySelector('input[name="difficulty"]:checked').value;
+            let pool, morse, options;
+            if (currentLevel === 'easy') {
+                pool = letterList;
+                currentAnswer = getRandomFrom(pool);
+                morse = morseDict[currentAnswer];
+                options = getOptions(currentAnswer, pool);
+                document.getElementById('game-instructions').textContent = 'Listen to the Morse code and select the correct letter.';
+            } else if (currentLevel === 'medium') {
+                pool = letterList.concat(numberList);
+                currentAnswer = getRandomFrom(pool);
+                morse = morseDict[currentAnswer];
+                options = getOptions(currentAnswer, pool);
+                document.getElementById('game-instructions').textContent = 'Listen to the Morse code and select the correct letter or number.';
+            } else {
+                pool = wordList;
+                currentAnswer = getRandomFrom(pool);
+                morse = wordToMorse(currentAnswer);
+                options = getOptions(currentAnswer, pool);
+                document.getElementById('game-instructions').textContent = 'Listen to the Morse code and select the correct word.';
+            }
+            document.getElementById('game-morse-display').textContent = '';
+            document.getElementById('game-feedback').textContent = '';
+            document.getElementById('game-score').textContent = gameScore;
+            document.getElementById('game-next').style.display = 'none';
+            renderGameOptions(options);
+            // Store morse for play button
+            document.getElementById('play-morse-game').setAttribute('data-morse', morse);
+        }
+        function renderGameOptions(options) {
+            const optionsDiv = document.getElementById('game-options');
+            optionsDiv.innerHTML = '';
+            options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.textContent = opt;
+                btn.onclick = function() { handleGameGuess(opt); };
+                optionsDiv.appendChild(btn);
+            });
+        }
+        function handleGameGuess(answer) {
+            Array.from(document.getElementsByClassName('option-btn')).forEach(btn => btn.disabled = true);
+            if (answer === currentAnswer) {
+                document.getElementById('game-feedback').textContent = '✅ Correct!';
+                gameScore++;
+            } else {
+                document.getElementById('game-feedback').textContent = `❌ Wrong! The answer was '${currentAnswer}'.`;
+            }
+            document.getElementById('game-score').textContent = gameScore;
+            document.getElementById('game-next').style.display = '';
+        }
+        document.getElementById('play-morse-game').onclick = function() {
+            const morse = this.getAttribute('data-morse');
+            fetch('/play_morse', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'morse=' + encodeURIComponent(morse)
+            })
+            .then(response => response.blob())
+            .then(blob => {
+                const audio = new Audio(URL.createObjectURL(blob));
+                audio.play();
+            });
+            document.getElementById('game-morse-display').textContent = morse;
+        };
+        document.querySelectorAll('input[name="difficulty"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                startGame();
+            });
+        });
+        document.getElementById('game-next').onclick = function() {
+            nextRound();
+        };
+        // Tutorial chart sound logic
+        document.querySelectorAll('.chart-btn').forEach(btn => {
+            btn.onclick = function() {
+                const ch = btn.getAttribute('data-char');
+                const morse = morseDict[ch];
+                if (!morse) return;
+                fetch('/play_morse', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: 'morse=' + encodeURIComponent(morse)
+                })
+                .then(response => response.blob())
+                .then(blob => {
+                    const audio = new Audio(URL.createObjectURL(blob));
+                    audio.play();
+                });
+            };
+        });
+    </script>
+</body>
+</html> 
