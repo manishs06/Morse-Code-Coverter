@@ -52,4 +52,4 @@ static/
 ## License
 MIT
 
----
+---⁤
